@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>B-Roll Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#14171a;
+    --panel:#1c2024;
+    --panel-2:#22262b;
+    --line:#2e3338;
+    --text:#e8eaed;
+    --dim:#8a9199;
+    --amber:#f0a83c;
+    --cyan:#4fd1c5;
+    --danger:#e2645a;
+    --mono:'IBM Plex Mono','Courier New',monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 80px;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:8px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .dot{width:10px;height:10px;background:var(--amber);border-radius:2px;flex:none;}
+  h1{font-size:19px;letter-spacing:0.02em;margin:0;font-weight:600;}
+  .tag{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:0.08em;text-transform:uppercase;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:16px;}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--dim);margin:0 0 14px;font-weight:600;font-family:var(--mono);}
+
+  label.field{display:block;margin-bottom:14px;}
+  label.field .lbl{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;}
+  input[type=text],input[type=password],textarea,select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    border-radius:6px;padding:10px 12px;font-family:var(--sans);font-size:14px;
+  }
+  textarea{font-family:var(--mono);font-size:13px;min-height:130px;resize:vertical;line-height:1.5;}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--cyan);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .row > *{flex:1;min-width:160px;}
+
+  .keybox{display:flex;gap:8px;align-items:center;}
+  .keybox input{flex:1;}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none;}
+  .status-dot.ok{background:var(--cyan);}
+  .status-dot.bad{background:var(--danger);}
+  .hint{font-size:11px;color:var(--dim);margin-top:6px;}
+  .hint a{color:var(--cyan);}
+
+  button{
+    font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.03em;
+    border:none;border-radius:6px;padding:11px 20px;cursor:pointer;
+    background:var(--amber);color:#1a1200;transition:filter .15s ease;
+  }
+  button:hover{filter:brightness(1.08);}
+  button:disabled{background:var(--line);color:var(--dim);cursor:not-allowed;}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--text);}
+  button.ghost:hover{border-color:var(--cyan);filter:none;}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap;}
+
+  #log{font-family:var(--mono);font-size:12px;color:var(--dim);white-space:pre-wrap;margin-top:12px;line-height:1.6;max-height:140px;overflow-y:auto;}
+  #log .ok{color:var(--cyan);}
+  #log .err{color:var(--danger);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:16px;}
+  .card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;}
+  .card video{width:100%;display:block;background:#000;aspect-ratio:16/9;object-fit:cover;}
+  .card .meta{padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+  .card .scene{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:0.05em;}
+  .card .query{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .card a.dl{font-family:var(--mono);font-size:11px;color:var(--cyan);text-decoration:none;}
+  .card a.dl:hover{text-decoration:underline;}
+  .card.failed .meta{color:var(--danger);}
+
+  footer{margin-top:28px;font-size:11px;color:var(--dim);line-height:1.6;}
+  footer code{background:var(--panel-2);padding:1px 5px;border-radius:3px;font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="dot"></div>
+      <h1>B-Roll Studio</h1>
+    </div>
+    <div class="tag">Pexels · runs locally in this tab</div>
+  </header>
+
+  <div class="panel">
+    <h2>01 · Pexels API Key</h2>
+    <div class="keybox">
+      <div class="status-dot" id="keyDot"></div>
+      <input type="password" id="apiKey" placeholder="Paste your Pexels API key here">
+      <button class="ghost" id="toggleKey" type="button">show</button>
+      <button id="validateBtn" type="button">Submit</button>
+    </div>
+    <div id="keyStatus" class="hint">Key stays in this browser tab only — never sent anywhere except api.pexels.com. Get a free key at <a href="https://www.pexels.com/api/" target="_blank">pexels.com/api</a>.</div>
+  </div>
+
+  <div class="panel">
+    <h2>02 · Scenes / Keywords</h2>
+    <label class="field">
+      <span class="lbl">One search term per line, in the order you want clips to appear</span>
+      <textarea id="keywords" placeholder="old man walking in park&#10;doctor talking to patient&#10;healthy food on table&#10;senior citizen exercising"></textarea>
+    </label>
+    <div class="row">
+      <label class="field">
+        <span class="lbl">Quality</span>
+        <select id="quality">
+          <option value="hd" selected>HD</option>
+          <option value="sd">SD (faster)</option>
+          <option value="uhd">UHD (slower)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="lbl">Orientation</span>
+        <select id="orientation">
+          <option value="landscape" selected>Landscape</option>
+          <option value="portrait">Portrait (Shorts/Reels)</option>
+          <option value="square">Square</option>
+        </select>
+      </label>
+    </div>
+    <div class="toolbar">
+      <button id="runBtn" type="button" disabled>Fetch B-Roll</button>
+      <button class="ghost" id="zipBtn" type="button" disabled>Download All (.zip)</button>
+    </div>
+    <div id="log"></div>
+  </div>
+
+  <div id="results"></div>
+
+  <footer>
+    Each clip is matched to the top Pexels result for its line. If a search returns nothing, that scene is skipped and logged above — swap in a more generic keyword and re-run just that line. Files download as <code>scene_01.mp4</code>, <code>scene_02.mp4</code>… so they stay in script order in your editor.
+  </footer>
+
+</div>
+
+<script>
+const apiKeyInput = document.getElementById('apiKey');
+const keyDot = document.getElementById('keyDot');
+const toggleKey = document.getElementById('toggleKey');
+const runBtn = document.getElementById('runBtn');
+const zipBtn = document.getElementById('zipBtn');
+const logEl = document.getElementById('log');
+const resultsEl = document.getElementById('results');
+
+let fetchedClips = []; // {index, query, url, blob}
+
+toggleKey.addEventListener('click', () => {
+  const hidden = apiKeyInput.type === 'password';
+  apiKeyInput.type = hidden ? 'text' : 'password';
+  toggleKey.textContent = hidden ? 'hide' : 'show';
+});
+
+const validateBtn = document.getElementById('validateBtn');
+const keyStatus = document.getElementById('keyStatus');
+let keyValidated = false;
+
+apiKeyInput.addEventListener('input', () => {
+  keyDot.className = 'status-dot';
+  keyValidated = false;
+  runBtn.disabled = true;
+});
+
+validateBtn.addEventListener('click', async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if(!apiKey){ keyStatus.textContent = 'Paste a key first.'; keyStatus.style.color = 'var(--danger)'; return; }
+  validateBtn.disabled = true;
+  validateBtn.textContent = 'checking...';
+  keyStatus.style.color = 'var(--dim)';
+  keyStatus.textContent = 'Checking key against Pexels...';
+  try {
+    const res = await fetch('https://api.pexels.com/videos/search?query=nature&per_page=1', {
+      headers: { Authorization: apiKey }
+    });
+    if(res.status === 401 || res.status === 403){
+      keyDot.className = 'status-dot bad';
+      keyStatus.style.color = 'var(--danger)';
+      keyStatus.textContent = 'Key rejected (401/403). Double-check you copied the full key from pexels.com/api with no extra spaces.';
+      keyValidated = false;
+      runBtn.disabled = true;
+    } else if(!res.ok){
+      keyDot.className = 'status-dot bad';
+      keyStatus.style.color = 'var(--danger)';
+      keyStatus.textContent = `Unexpected response (HTTP ${res.status}). Check console (F12) for details.`;
+      keyValidated = false;
+      runBtn.disabled = true;
+    } else {
+      const data = await res.json();
+      keyDot.className = 'status-dot ok';
+      keyStatus.style.color = 'var(--cyan)';
+      keyStatus.textContent = `Key works. Remaining monthly requests: ${res.headers.get('x-ratelimit-remaining') || 'unknown'}.`;
+      keyValidated = true;
+      runBtn.disabled = false;
+    }
+  } catch(e){
+    keyDot.className = 'status-dot bad';
+    keyStatus.style.color = 'var(--danger)';
+    keyStatus.textContent = 'Network/CORS error reaching Pexels — check your internet connection or browser extensions blocking requests. (' + e.message + ')';
+    keyValidated = false;
+    runBtn.disabled = true;
+  }
+  validateBtn.disabled = false;
+  validateBtn.textContent = 'Submit';
+});
+
+function log(msg, cls){
+  const line = document.createElement('div');
+  if(cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function searchClip(query, quality, orientation, apiKey){
+  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5&orientation=${orientation}`;
+  const res = await fetch(url, { headers: { Authorization: apiKey } });
+  if(!res.ok){
+    if(res.status === 401) throw new Error('Invalid API key');
+    if(res.status === 429) throw new Error('Rate limited — wait a moment');
+    throw new Error('HTTP ' + res.status);
+  }
+  const data = await res.json();
+  const video = data.videos && data.videos[0];
+  if(!video){
+    log(`  (debug) total_results from Pexels: ${data.total_results ?? 'n/a'}, raw keys: ${Object.keys(data).join(', ')}`);
+    return null;
+  }
+  const files = video.video_files || [];
+  let chosen = files.find(f => f.quality === quality);
+  if(!chosen && files.length) chosen = files.reduce((a,b) => (b.width||0) > (a.width||0) ? b : a);
+  return chosen ? { link: chosen.link, thumb: video.image } : null;
+}
+
+runBtn.addEventListener('click', async () => {
+  const apiKey = apiKeyInput.value.trim();
+  const quality = document.getElementById('quality').value;
+  const orientation = document.getElementById('orientation').value;
+  const lines = document.getElementById('keywords').value.split('\n').map(s => s.trim()).filter(Boolean);
+
+  if(!apiKey){ log('Enter your Pexels API key first.', 'err'); return; }
+  if(!keyValidated){ log('Click Submit next to the API key first to validate it.', 'err'); return; }
+  if(!lines.length){ log('Add at least one keyword line.', 'err'); return; }
+
+  runBtn.disabled = true;
+  zipBtn.disabled = true;
+  logEl.innerHTML = '';
+  resultsEl.innerHTML = '';
+  fetchedClips = [];
+
+  log(`Found ${lines.length} scenes. Starting...`);
+
+  for(let i = 0; i < lines.length; i++){
+    const query = lines[i];
+    const sceneNum = String(i+1).padStart(2,'0');
+    log(`[${sceneNum}] Searching: ${query}`);
+    try {
+      const result = await searchClip(query, quality, orientation, apiKey);
+      if(!result){
+        log(`  no match for "${query}"`, 'err');
+        renderCard(sceneNum, query, null, null);
+        continue;
+      }
+      fetchedClips.push({ sceneNum, query, url: result.link });
+      log(`  ✓ matched`, 'ok');
+      renderCard(sceneNum, query, result.link, result.thumb);
+    } catch(e){
+      log(`  error: ${e.message}`, 'err');
+      renderCard(sceneNum, query, null, null);
+    }
+    await new Promise(r => setTimeout(r, 400)); // gentle pacing
+  }
+
+  log(`Done. ${fetchedClips.length}/${lines.length} clips ready.`, 'ok');
+  runBtn.disabled = false;
+  if(fetchedClips.length) zipBtn.disabled = false;
+});
+
+function renderCard(sceneNum, query, link, thumb){
+  const card = document.createElement('div');
+  card.className = 'card' + (link ? '' : ' failed');
+  card.innerHTML = `
+    ${link ? `<video src="${link}" muted loop preload="metadata" onmouseover="this.play()" onmouseout="this.pause()"></video>` : `<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:#e2645a;font-family:var(--mono);font-size:11px;">no match</div>`}
+    <div class="meta">
+      <div class="scene">SCENE ${sceneNum}</div>
+      <div class="query" title="${query}">${query}</div>
+      ${link ? `<a class="dl" href="${link}" download="scene_${sceneNum}.mp4">↓ download</a>` : ''}
+    </div>
+  `;
+  if(!resultsEl.querySelector('.grid')){
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    resultsEl.appendChild(grid);
+  }
+  resultsEl.querySelector('.grid').appendChild(card);
+}
+
+zipBtn.addEventListener('click', async () => {
+  zipBtn.disabled = true;
+  zipBtn.textContent = 'zipping...';
+  const zip = new JSZip();
+  for(const clip of fetchedClips){
+    log(`Packing scene_${clip.sceneNum}.mp4 ...`);
+    const res = await fetch(clip.url);
+    const blob = await res.blob();
+    zip.file(`scene_${clip.sceneNum}.mp4`, blob);
+  }
+  const content = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = 'broll_pack.zip';
+  a.click();
+  zipBtn.textContent = 'Download All (.zip)';
+  zipBtn.disabled = false;
+  log('Zip ready and downloaded.', 'ok');
+});
+</script>
+</body>
+</html>
